@@ -1,4 +1,4 @@
-import { openai } from 'ai/openai';
+import { openai } from '@ai-sdk/openai';
 import { generateObject, generateText } from 'ai';
 import { z } from 'zod';
 import dayjs from 'dayjs';

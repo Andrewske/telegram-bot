@@ -16,6 +16,7 @@
     "typescript": "^5"
   },
   "dependencies": {
+    "@ai-sdk/openai": "^2.0.30",
     "ai": "^5.0.44",
     "dayjs": "^1.11.18",
     "googleapis": "^159.0.0",
