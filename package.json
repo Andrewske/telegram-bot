@@ -1,0 +1,26 @@
+{
+  "name": "personal-historian-bot",
+  "module": "src/bot.ts",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "bun run --watch src/bot.ts",
+    "start": "bun run src/bot.ts",
+    "build": "bun build src/bot.ts --outdir ./dist --target bun"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/pg": "^8.15.5"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "ai": "^5.0.44",
+    "dayjs": "^1.11.18",
+    "googleapis": "^159.0.0",
+    "pg": "^8.16.3",
+    "telegraf": "^4.16.3",
+    "zod": "^4.1.8"
+  }
+}
