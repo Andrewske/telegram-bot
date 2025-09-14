@@ -137,6 +137,13 @@ bot.catch((err, ctx) => {
 // Start the bot
 async function startBot() {
   console.log('Starting Personal Historian Bot...');
+  console.log('Environment check:', {
+    NODE_ENV: process.env.NODE_ENV,
+    PORT: process.env.PORT,
+    BOT_TOKEN: process.env.BOT_TOKEN ? 'Set' : 'Missing',
+    DATABASE_URL: process.env.DATABASE_URL ? 'Set' : 'Missing',
+    OPENAI_API_KEY: process.env.OPENAI_API_KEY ? 'Set' : 'Missing',
+  });
 
   // Start the scheduler for check-ins
   startScheduler();
@@ -144,10 +151,10 @@ async function startBot() {
   if (process.env.NODE_ENV === 'production') {
     // Production: use webhooks
     const webhookUrl = `${process.env.RAILWAY_STATIC_URL || 'https://your-app.railway.app'}/webhook`;
-    console.log(`Setting webhook to: ${webhookUrl}`);
+    console.log(`Webhook URL will be: ${webhookUrl}`);
+    console.log(`Note: Set webhook manually with: curl -X POST "https://api.telegram.org/bot{BOT_TOKEN}/setWebhook" -d '{"url": "${webhookUrl}"}'`);
 
-    // Set webhook
-    await bot.telegram.setWebhook(webhookUrl);
+    // Don't set webhook automatically - do it manually after deployment
 
     // Start webhook server
     const server = bot.webhookCallback('/webhook');
@@ -167,9 +174,12 @@ async function startBot() {
       },
     };
 
-    console.log(`Bot started on port ${PORT} with webhooks`);
+    console.log(`Bot starting on port ${PORT} with webhooks`);
+    console.log(`Health check available at: http://localhost:${PORT}/health`);
+
     Bun.serve({
-      port: PORT,
+      port: parseInt(PORT.toString()),
+      hostname: "0.0.0.0", // Important for Railway
       fetch: app.fetch,
     });
   } else {
