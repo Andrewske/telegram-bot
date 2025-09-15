@@ -156,14 +156,24 @@ async function startBot() {
 
     // Don't set webhook automatically - do it manually after deployment
 
-    // Start webhook server
-    const server = bot.webhookCallback('/webhook');
+    // Start webhook server with manual handling
     const app = {
       fetch: async (request: Request) => {
         const url = new URL(request.url);
 
         if (url.pathname === '/webhook' && request.method === 'POST') {
-          return server(request);
+          try {
+            const body = await request.text();
+            const update = JSON.parse(body);
+
+            // Handle the update manually
+            await bot.handleUpdate(update);
+
+            return new Response('OK', { status: 200 });
+          } catch (error) {
+            console.error('Webhook error:', error);
+            return new Response('Error processing webhook', { status: 500 });
+          }
         }
 
         if (url.pathname === '/health') {
