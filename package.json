@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@ai-sdk/openai": "^2.0.30",
+    "@octokit/rest": "^22.0.0",
     "ai": "^5.0.44",
     "dayjs": "^1.11.18",
     "googleapis": "^159.0.0",

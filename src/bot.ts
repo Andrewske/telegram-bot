@@ -5,7 +5,7 @@ import timezone from 'dayjs/plugin/timezone.js';
 
 import { getUserState, upsertUserState, updateNextCheckin } from './lib/db.js';
 import { processUserMessage, generateCheckinMessage } from './lib/llm.js';
-import { appendToDaily, uploadPhoto, generatePhotoMarkdown } from './lib/drive.js';
+import { appendToDaily, uploadPhoto, generatePhotoMarkdown, initializeGitHub } from './lib/github-storage.js';
 import { sendMessage, downloadPhoto, isAllowedUser, generatePhotoFilename } from './lib/telegram.js';
 import { startScheduler } from './scheduler.js';
 
@@ -144,6 +144,15 @@ async function startBot() {
     DATABASE_URL: process.env.DATABASE_URL ? 'Set' : 'Missing',
     OPENAI_API_KEY: process.env.OPENAI_API_KEY ? 'Set' : 'Missing',
   });
+
+  // Initialize GitHub connection
+  try {
+    await initializeGitHub();
+    console.log('✅ GitHub storage initialized successfully');
+  } catch (error: any) {
+    console.error('❌ Failed to initialize GitHub storage:', error.message);
+    process.exit(1);
+  }
 
   // Start the scheduler for check-ins
   startScheduler();
