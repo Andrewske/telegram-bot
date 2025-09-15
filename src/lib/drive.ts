@@ -77,10 +77,13 @@ export async function uploadPhoto(
 async function getOrCreateAttachmentsFolder(parentFolderId: string): Promise<string> {
   const driveClient = getDriveClient();
 
-  // Check if attachments folder exists
   try {
+    // Validate the parent folder first
+    const validatedFolderId = await validateAndGetFolderId(parentFolderId);
+
+    // Check if attachments folder exists
     const searchResponse = await driveClient.files.list({
-      q: `name='attachments' and '${parentFolderId}' in parents and mimeType='application/vnd.google-apps.folder'`,
+      q: `name='attachments' and '${validatedFolderId}' in parents and mimeType='application/vnd.google-apps.folder'`,
       fields: 'files(id, name)',
     });
 
@@ -91,7 +94,7 @@ async function getOrCreateAttachmentsFolder(parentFolderId: string): Promise<str
     // Create attachments folder
     const folderMetadata = {
       name: 'attachments',
-      parents: [parentFolderId],
+      parents: [validatedFolderId],
       mimeType: 'application/vnd.google-apps.folder',
     };
 
@@ -149,13 +152,48 @@ export async function appendToDaily(
   }
 }
 
+async function validateAndGetFolderId(folderId: string): Promise<string> {
+  const driveClient = getDriveClient();
+
+  try {
+    // First check if the folder exists and we have access
+    await driveClient.files.get({
+      fileId: folderId,
+      fields: 'id, name, mimeType',
+    });
+    return folderId;
+  } catch (error: any) {
+    if (error.code === 404) {
+      console.warn(`Drive folder ${folderId} not found. Creating new root folder...`);
+      // Create a new root folder for the bot
+      const folderMetadata = {
+        name: 'Personal Historian Bot',
+        mimeType: 'application/vnd.google-apps.folder',
+      };
+
+      const folderResponse = await driveClient.files.create({
+        requestBody: folderMetadata,
+      });
+
+      const newFolderId = folderResponse.data.id;
+      console.log(`Created new root folder with ID: ${newFolderId}`);
+      console.log(`Please update your DRIVE_FOLDER_ID environment variable to: ${newFolderId}`);
+      return newFolderId;
+    }
+    throw error;
+  }
+}
+
 async function getOrCreateDailyFile(filename: string, parentFolderId: string): Promise<string> {
   const driveClient = getDriveClient();
 
   try {
+    // Validate the parent folder first
+    const validatedFolderId = await validateAndGetFolderId(parentFolderId);
+
     // Check if file exists
     const searchResponse = await driveClient.files.list({
-      q: `name='${filename}' and '${parentFolderId}' in parents`,
+      q: `name='${filename}' and '${validatedFolderId}' in parents`,
       fields: 'files(id, name)',
     });
 
@@ -166,7 +204,7 @@ async function getOrCreateDailyFile(filename: string, parentFolderId: string): P
     // Create new file
     const fileMetadata = {
       name: filename,
-      parents: [parentFolderId],
+      parents: [validatedFolderId],
     };
 
     const media = {
