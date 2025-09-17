@@ -2,6 +2,11 @@ import { openai } from '@ai-sdk/openai';
 import { generateObject, generateText } from 'ai';
 import { z } from 'zod';
 import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc.js';
+import timezone from 'dayjs/plugin/timezone.js';
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
 
 const ResponseSchema = z.object({
   response_text: z.string().describe('Conversational response to send to the user'),
@@ -15,14 +20,15 @@ type LLMResponse = z.infer<typeof ResponseSchema>;
 export async function processUserMessage(
   message: string,
   hasPhoto: boolean = false,
-  recentContext?: string
+  recentContext?: string,
+  userTimezone: string = 'America/Los_Angeles'
 ): Promise<LLMResponse> {
   const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
   if (!OPENAI_API_KEY) {
     throw new Error('OPENAI_API_KEY environment variable is required');
   }
 
-  const currentTime = dayjs().format('YYYY-MM-DD HH:mm');
+  const currentTime = dayjs().tz(userTimezone).format('YYYY-MM-DD HH:mm');
   const contextPrompt = recentContext ? `\n\nRecent context from Telegram:\n${recentContext}` : '';
   const photoNote = hasPhoto ? ' (User sent a photo with this message)' : '';
 
@@ -81,7 +87,7 @@ export async function generateCheckinMessage(
     return "What are you up to?";
   }
 
-  const currentTime = dayjs().format('YYYY-MM-DD HH:mm');
+  const currentTime = dayjs().tz(userTimezone).format('YYYY-MM-DD HH:mm');
   const lastActivityContext = lastActivity ? `\n\nLast recorded activity: ${lastActivity}` : '';
 
   const systemPrompt = `You are a personal life historian assistant checking in with the user.

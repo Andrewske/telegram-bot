@@ -63,7 +63,7 @@ bot.on('text', async (ctx) => {
     console.log(`Processing message from ${userId}: ${message.slice(0, 100)}...`);
 
     // Process message with LLM
-    const llmResponse = await processUserMessage(message, false);
+    const llmResponse = await processUserMessage(message, false, undefined, timezone);
 
     // Save to daily file
     const today = dayjs().tz(timezone).format('YYYY-MM-DD');
@@ -105,7 +105,7 @@ bot.on('photo', async (ctx) => {
     await uploadPhoto(photoBuffer, filename);
 
     // Process caption with LLM
-    const llmResponse = await processUserMessage(caption, true);
+    const llmResponse = await processUserMessage(caption, true, undefined, timezone);
 
     // Generate markdown content with photo
     const photoMarkdown = generatePhotoMarkdown(filename, caption);
