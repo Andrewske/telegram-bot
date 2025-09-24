@@ -7,7 +7,7 @@ import { getUserState, upsertUserState, updateNextCheckin } from './lib/db.js';
 import { processUserMessage, generateCheckinMessage } from './lib/llm.js';
 import { appendToDaily, uploadPhoto, generatePhotoMarkdown, initializeGitHub } from './lib/github-storage.js';
 import { sendMessage, downloadPhoto, isAllowedUser, generatePhotoFilename } from './lib/telegram.js';
-import { startScheduler } from './scheduler.js';
+import { startScheduler, getRandomCheckinInterval } from './scheduler.js';
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -36,8 +36,9 @@ bot.start(async (ctx) => {
   const userId = ctx.from.id.toString();
   const timezone = process.env.TZ_DEFAULT || 'America/Los_Angeles';
 
-  // Set next check-in to 1 hour from now
-  const nextCheckin = dayjs().add(1, 'hour').toDate();
+  // Set next check-in to random interval between 3.5-4.5 hours
+  const randomMinutes = getRandomCheckinInterval();
+  const nextCheckin = dayjs().add(randomMinutes, 'minute').toDate();
   await upsertUserState(userId, nextCheckin, timezone);
 
   await ctx.reply(
@@ -69,14 +70,15 @@ bot.on('text', async (ctx) => {
     const today = dayjs().tz(timezone).format('YYYY-MM-DD');
     await appendToDaily(today, `${llmResponse.activity_summary}`, timezone);
 
-    // Schedule next check-in
-    const nextCheckin = dayjs().add(llmResponse.next_checkin_minutes, 'minute').toDate();
+    // Schedule next check-in using random interval
+    const randomMinutes = getRandomCheckinInterval();
+    const nextCheckin = dayjs().add(randomMinutes, 'minute').toDate();
     await updateNextCheckin(userId, nextCheckin);
 
     // Reply to user
     await ctx.reply(llmResponse.response_text);
 
-    console.log(`Scheduled next check-in for ${userId} at ${nextCheckin.toISOString()}`);
+    console.log(`Scheduled next check-in for ${userId} at ${nextCheckin.toISOString()} (in ${Math.round(randomMinutes/60*10)/10} hours)`);
   } catch (error) {
     console.error('Error processing text message:', error);
     await ctx.reply("Sorry, I had trouble processing that. Let me try again in a moment.");
@@ -115,14 +117,15 @@ bot.on('photo', async (ctx) => {
     const today = dayjs().tz(timezone).format('YYYY-MM-DD');
     await appendToDaily(today, fullContent, timezone);
 
-    // Schedule next check-in
-    const nextCheckin = dayjs().add(llmResponse.next_checkin_minutes, 'minute').toDate();
+    // Schedule next check-in using random interval
+    const randomMinutes = getRandomCheckinInterval();
+    const nextCheckin = dayjs().add(randomMinutes, 'minute').toDate();
     await updateNextCheckin(userId, nextCheckin);
 
     // Reply to user
     await ctx.reply(llmResponse.response_text);
 
-    console.log(`Photo processed and saved for ${userId}`);
+    console.log(`Photo processed and saved for ${userId}, next check-in in ${Math.round(randomMinutes/60*10)/10} hours`);
   } catch (error) {
     console.error('Error processing photo:', error);
     await ctx.reply("I received your photo but had trouble processing it. I'll try to check back later!");

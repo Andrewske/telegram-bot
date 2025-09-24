@@ -10,7 +10,6 @@ dayjs.extend(timezone);
 
 const ResponseSchema = z.object({
   response_text: z.string().describe('Conversational response to send to the user'),
-  next_checkin_minutes: z.number().min(5).max(1440).describe('Minutes until next check-in (5-1440)'),
   activity_summary: z.string().describe('Brief summary of what the user is doing'),
   context_tags: z.array(z.string()).optional().describe('Optional tags for categorization'),
 });
@@ -71,7 +70,6 @@ Respond with a JSON object containing your conversational response and next chec
     // Fallback response
     return {
       response_text: "Got it! I've recorded that for you.",
-      next_checkin_minutes: 60,
       activity_summary: message.slice(0, 100),
       context_tags: [],
     };

@@ -55,6 +55,13 @@ async function processCheckIns(): Promise<void> {
   }
 }
 
+// Generate random interval between 3.5 and 4.5 hours (in minutes)
+export function getRandomCheckinInterval(): number {
+  const minMinutes = 3.5 * 60; // 210 minutes
+  const maxMinutes = 4.5 * 60; // 270 minutes
+  return Math.floor(Math.random() * (maxMinutes - minMinutes + 1)) + minMinutes;
+}
+
 async function sendCheckIn(userState: any): Promise<void> {
   const userId = userState.user_id.toString();
   const timezone = userState.timezone || 'America/Los_Angeles';
@@ -68,13 +75,13 @@ async function sendCheckIn(userState: any): Promise<void> {
     // Send the message
     await sendMessage(userId, message);
 
-    // Update next check-in to 1 hour from now (default)
-    // The user's response will update this based on their activity
+    // Update next check-in to random interval between 3.5-4.5 hours
     const { updateNextCheckin } = await import('./lib/db.js');
-    const nextCheckin = dayjs().add(1, 'hour').toDate();
+    const randomMinutes = getRandomCheckinInterval();
+    const nextCheckin = dayjs().add(randomMinutes, 'minute').toDate();
     await updateNextCheckin(userId, nextCheckin);
 
-    console.log(`Check-in sent to ${userId}, next check-in scheduled for ${nextCheckin.toISOString()}`);
+    console.log(`Check-in sent to ${userId}, next check-in scheduled for ${nextCheckin.toISOString()} (in ${Math.round(randomMinutes/60*10)/10} hours)`);
   } catch (error) {
     console.error(`Failed to send check-in to ${userId}:`, error);
 
