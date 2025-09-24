@@ -8,6 +8,7 @@ import { processUserMessage, generateCheckinMessage } from './lib/llm.js';
 import { appendToDaily, uploadPhoto, generatePhotoMarkdown, initializeGitHub } from './lib/github-storage.js';
 import { sendMessage, downloadPhoto, isAllowedUser, generatePhotoFilename } from './lib/telegram.js';
 import { startScheduler, getRandomCheckinInterval } from './scheduler.js';
+import { routeMessage, routePhoto, initializeHandlers } from './lib/message-router.js';
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -60,25 +61,46 @@ bot.on('text', async (ctx) => {
     const userState = await getUserState(userId);
     const timezone = userState?.timezone || process.env.TZ_DEFAULT || 'America/Los_Angeles';
     const message = ctx.message.text;
+    const messageId = ctx.message.message_id;
+    const replyToMessageId = ctx.message.reply_to_message?.message_id;
 
     console.log(`Processing message from ${userId}: ${message.slice(0, 100)}...`);
 
-    // Process message with LLM
-    const llmResponse = await processUserMessage(message, false, undefined, timezone);
+    try {
+      // Try to route to specialized handlers first
+      const handlerResult = await routeMessage(message, userId, messageId, timezone, replyToMessageId);
 
-    // Save to daily file
-    const today = dayjs().tz(timezone).format('YYYY-MM-DD');
-    await appendToDaily(today, `${llmResponse.activity_summary}`, timezone);
+      await ctx.reply(handlerResult.response);
 
-    // Schedule next check-in using random interval
-    const randomMinutes = getRandomCheckinInterval();
-    const nextCheckin = dayjs().add(randomMinutes, 'minute').toDate();
-    await updateNextCheckin(userId, nextCheckin);
+      // Update check-in schedule if requested by handler
+      if (handlerResult.shouldUpdateCheckin) {
+        const randomMinutes = getRandomCheckinInterval();
+        const nextCheckin = dayjs().add(randomMinutes, 'minute').toDate();
+        await updateNextCheckin(userId, nextCheckin);
+        console.log(`Scheduled next check-in for ${userId} at ${nextCheckin.toISOString()} (in ${Math.round(randomMinutes/60*10)/10} hours)`);
+      }
+    } catch (error: any) {
+      if (error.message === 'NO_HANDLER_FOUND') {
+        // Fallback to default life journal processing
+        const llmResponse = await processUserMessage(message, false, undefined, timezone);
 
-    // Reply to user
-    await ctx.reply(llmResponse.response_text);
+        // Save to daily file
+        const today = dayjs().tz(timezone).format('YYYY-MM-DD');
+        await appendToDaily(today, `${llmResponse.activity_summary}`, timezone);
 
-    console.log(`Scheduled next check-in for ${userId} at ${nextCheckin.toISOString()} (in ${Math.round(randomMinutes/60*10)/10} hours)`);
+        // Schedule next check-in using random interval
+        const randomMinutes = getRandomCheckinInterval();
+        const nextCheckin = dayjs().add(randomMinutes, 'minute').toDate();
+        await updateNextCheckin(userId, nextCheckin);
+
+        // Reply to user
+        await ctx.reply(llmResponse.response_text);
+
+        console.log(`Scheduled next check-in for ${userId} at ${nextCheckin.toISOString()} (in ${Math.round(randomMinutes/60*10)/10} hours)`);
+      } else {
+        throw error;
+      }
+    }
   } catch (error) {
     console.error('Error processing text message:', error);
     await ctx.reply("Sorry, I had trouble processing that. Let me try again in a moment.");
@@ -92,40 +114,63 @@ bot.on('photo', async (ctx) => {
     const userState = await getUserState(userId);
     const timezone = userState?.timezone || process.env.TZ_DEFAULT || 'America/Los_Angeles';
     const caption = ctx.message.caption || 'Photo shared';
+    const messageId = ctx.message.message_id;
 
     console.log(`Processing photo from ${userId} with caption: ${caption}`);
 
     // Get the highest resolution photo
     const photos = ctx.message.photo;
+    if (!photos || photos.length === 0) {
+      throw new Error('No photo data received');
+    }
     const photo = photos[photos.length - 1];
 
     // Download photo from Telegram
     const photoBuffer = await downloadPhoto(photo.file_id);
 
-    // Generate filename and upload to Drive
-    const filename = generatePhotoFilename(ctx.from.id, new Date());
-    await uploadPhoto(photoBuffer, filename);
+    try {
+      // Try to route to specialized handlers first
+      const handlerResult = await routePhoto(photoBuffer, caption, userId, messageId, timezone);
 
-    // Process caption with LLM
-    const llmResponse = await processUserMessage(caption, true, undefined, timezone);
+      await ctx.reply(handlerResult.response);
 
-    // Generate markdown content with photo
-    const photoMarkdown = generatePhotoMarkdown(filename, caption);
-    const fullContent = `${photoMarkdown}\n${llmResponse.activity_summary}`;
+      // Update check-in schedule if requested by handler
+      if (handlerResult.shouldUpdateCheckin) {
+        const randomMinutes = getRandomCheckinInterval();
+        const nextCheckin = dayjs().add(randomMinutes, 'minute').toDate();
+        await updateNextCheckin(userId, nextCheckin);
+        console.log(`Scheduled next check-in for ${userId} at ${nextCheckin.toISOString()} (in ${Math.round(randomMinutes/60*10)/10} hours)`);
+      }
+    } catch (error: any) {
+      if (error.message === 'NO_HANDLER_FOUND') {
+        // Fallback to default life journal photo processing
+        const filename = generatePhotoFilename(ctx.from.id, new Date());
+        await uploadPhoto(photoBuffer, filename);
 
-    // Save to daily file
-    const today = dayjs().tz(timezone).format('YYYY-MM-DD');
-    await appendToDaily(today, fullContent, timezone);
+        // Process caption with LLM
+        const llmResponse = await processUserMessage(caption, true, undefined, timezone);
 
-    // Schedule next check-in using random interval
-    const randomMinutes = getRandomCheckinInterval();
-    const nextCheckin = dayjs().add(randomMinutes, 'minute').toDate();
-    await updateNextCheckin(userId, nextCheckin);
+        // Generate markdown content with photo
+        const photoMarkdown = generatePhotoMarkdown(filename, caption);
+        const fullContent = `${photoMarkdown}\n${llmResponse.activity_summary}`;
 
-    // Reply to user
-    await ctx.reply(llmResponse.response_text);
+        // Save to daily file
+        const today = dayjs().tz(timezone).format('YYYY-MM-DD');
+        await appendToDaily(today, fullContent, timezone);
 
-    console.log(`Photo processed and saved for ${userId}, next check-in in ${Math.round(randomMinutes/60*10)/10} hours`);
+        // Schedule next check-in using random interval
+        const randomMinutes = getRandomCheckinInterval();
+        const nextCheckin = dayjs().add(randomMinutes, 'minute').toDate();
+        await updateNextCheckin(userId, nextCheckin);
+
+        // Reply to user
+        await ctx.reply(llmResponse.response_text);
+
+        console.log(`Photo processed and saved for ${userId}, next check-in in ${Math.round(randomMinutes/60*10)/10} hours`);
+      } else {
+        throw error;
+      }
+    }
   } catch (error) {
     console.error('Error processing photo:', error);
     await ctx.reply("I received your photo but had trouble processing it. I'll try to check back later!");
@@ -154,6 +199,15 @@ async function startBot() {
     console.log('✅ GitHub storage initialized successfully');
   } catch (error: any) {
     console.error('❌ Failed to initialize GitHub storage:', error.message);
+    process.exit(1);
+  }
+
+  // Initialize message handlers
+  try {
+    await initializeHandlers();
+    console.log('✅ Message handlers initialized successfully');
+  } catch (error: any) {
+    console.error('❌ Failed to initialize message handlers:', error.message);
     process.exit(1);
   }
 

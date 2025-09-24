@@ -1,0 +1,1 @@
+export { handler as foodHandler } from './food-handler.js';
