@@ -253,21 +253,35 @@ async function startBot() {
     console.log(`Bot starting on port ${PORT} with webhooks`);
     console.log(`Health check available at: http://localhost:${PORT}/health`);
 
-    Bun.serve({
-      port: parseInt(PORT.toString()),
+    const server = Bun.serve({
+      port: parseInt(PORT.toString(), 10),
       hostname: "0.0.0.0", // Important for Railway
       fetch: app.fetch,
+    });
+
+    console.log(`✅ Webhook server started on port ${PORT}`);
+
+    // Handle graceful shutdown for webhook mode
+    process.once('SIGINT', () => {
+      console.log('Shutting down webhook server...');
+      server.stop();
+      process.exit(0);
+    });
+    process.once('SIGTERM', () => {
+      console.log('Shutting down webhook server...');
+      server.stop();
+      process.exit(0);
     });
   } else {
     // Development: use polling
     console.log('Starting bot in polling mode for development...');
     await bot.launch();
+
+    // Handle graceful shutdown for polling mode
+    process.once('SIGINT', () => bot.stop('SIGINT'));
+    process.once('SIGTERM', () => bot.stop('SIGTERM'));
   }
 }
-
-// Handle graceful shutdown
-process.once('SIGINT', () => bot.stop('SIGINT'));
-process.once('SIGTERM', () => bot.stop('SIGTERM'));
 
 // Start the application
 startBot().catch((error) => {
