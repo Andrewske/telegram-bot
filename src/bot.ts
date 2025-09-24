@@ -84,9 +84,11 @@ bot.on('text', async (ctx) => {
         // Fallback to default life journal processing
         const llmResponse = await processUserMessage(message, false, undefined, timezone);
 
-        // Save to daily file
+        // Save each activity to daily file
         const today = dayjs().tz(timezone).format('YYYY-MM-DD');
-        await appendToDaily(today, `${llmResponse.activity_summary}`, timezone);
+        for (const activity of llmResponse.activities) {
+          await appendToDaily(today, activity.summary, timezone);
+        }
 
         // Schedule next check-in using random interval
         const randomMinutes = getRandomCheckinInterval();
@@ -150,13 +152,23 @@ bot.on('photo', async (ctx) => {
         // Process caption with LLM
         const llmResponse = await processUserMessage(caption, true, undefined, timezone);
 
-        // Generate markdown content with photo
+        // Generate markdown content with photo and save each activity
         const photoMarkdown = generatePhotoMarkdown(filename, caption);
-        const fullContent = `${photoMarkdown}\n${llmResponse.activity_summary}`;
-
-        // Save to daily file
         const today = dayjs().tz(timezone).format('YYYY-MM-DD');
-        await appendToDaily(today, fullContent, timezone);
+
+        // Save photo reference with first activity
+        if (llmResponse.activities.length > 0) {
+          const firstActivity = `${photoMarkdown}\n${llmResponse.activities[0].summary}`;
+          await appendToDaily(today, firstActivity, timezone);
+
+          // Save remaining activities separately
+          for (let i = 1; i < llmResponse.activities.length; i++) {
+            await appendToDaily(today, llmResponse.activities[i].summary, timezone);
+          }
+        } else {
+          // Fallback if no activities
+          await appendToDaily(today, `${photoMarkdown}\n${caption}`, timezone);
+        }
 
         // Schedule next check-in using random interval
         const randomMinutes = getRandomCheckinInterval();

@@ -8,9 +8,14 @@ import timezone from 'dayjs/plugin/timezone.js';
 dayjs.extend(utc);
 dayjs.extend(timezone);
 
+const ActivitySchema = z.object({
+  summary: z.string().describe('Brief summary of this specific activity'),
+  relative_time: z.string().optional().describe('Optional time indicator if mentioned (e.g., "then", "after", "at 3pm")'),
+});
+
 const ResponseSchema = z.object({
   response_text: z.string().describe('Conversational response to send to the user'),
-  activity_summary: z.string().describe('Brief summary of what the user is doing'),
+  activities: z.array(ActivitySchema).describe('Array of separate activities extracted from the message'),
   context_tags: z.array(z.string()).optional().describe('Optional tags for categorization'),
 });
 
@@ -51,9 +56,22 @@ Guidelines:
 - For events (concerts, meetings, etc.), wait until after they're likely done to follow up
 - Show genuine interest and ask contextual questions
 
+Activity Processing:
+- Break down the message into separate distinct activities
+- Look for transition words like "then", "after", "next", "later", "before"
+- Each activity should be a separate, complete action or event
+- Preserve chronological order when indicated
+- If only one activity is mentioned, return it as a single item in the activities array
+- For compound sentences, identify each distinct activity
+
+Examples:
+- "I had lunch then went to the gym" → 2 activities: "had lunch", "went to the gym"
+- "Working on project presentation" → 1 activity: "working on project presentation"
+- "Finished meeting, grabbed coffee, now coding" → 3 activities: "finished meeting", "grabbed coffee", "coding"
+
 The user message${photoNote}: "${message}"
 
-Respond with a JSON object containing your conversational response and next check-in timing.`;
+Respond with a JSON object containing your conversational response and activities array.`;
 
   try {
     const result = await generateObject({
@@ -70,7 +88,9 @@ Respond with a JSON object containing your conversational response and next chec
     // Fallback response
     return {
       response_text: "Got it! I've recorded that for you.",
-      activity_summary: message.slice(0, 100),
+      activities: [{
+        summary: message.slice(0, 100),
+      }],
       context_tags: [],
     };
   }
