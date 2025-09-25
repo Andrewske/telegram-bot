@@ -104,21 +104,32 @@ export abstract class BaseHandler {
     if (missingFields.length === 0) return '';
 
     const fieldDescriptions: Record<string, string> = {
-      context: 'context (alone/with Bre/with friends/etc)',
-      energy_level: 'energy level (1-10)',
-      mood: 'mood',
-      hunger_level: 'hunger level (1-10)',
+      context: 'eating context (alone/with Bre/with friends/at work/etc)',
+      work_state: 'work state (still working/on break/done for day/not work day)',
+      current_activity: 'current activity (what are you doing right now?)',
+      eating_trigger: 'eating trigger (why are you eating?)',
     };
 
-    const formattedFields = missingFields.map(field => fieldDescriptions[field] || field);
+    const fieldQuestions: Record<string, string> = {
+      context: 'Where/with whom are you eating?',
+      work_state: 'Are you still working, on break, done for the day, or is it not a work day?',
+      current_activity: 'What are you doing right now? (working, watching TV, pacing, lying down, etc.)',
+      eating_trigger: 'Why are you eating? (timer/reminder, stomach growling, saw food, felt you should, stress/boredom, celebration)',
+    };
 
-    if (formattedFields.length === 1) {
-      return `What's your ${formattedFields[0]}?`;
-    } else if (formattedFields.length === 2) {
-      return `What's your ${formattedFields[0]} and ${formattedFields[1]}?`;
+    // Use specific questions for behavioral fields, fallback to generic format
+    if (missingFields.length === 1) {
+      const field = missingFields[0];
+      return fieldQuestions[field] || `What's your ${fieldDescriptions[field] || field}?`;
+    } else if (missingFields.length === 2) {
+      const questions = missingFields.map(field =>
+        fieldQuestions[field] || `${fieldDescriptions[field] || field}?`
+      );
+      return `${questions[0]} Also, ${questions[1].toLowerCase()}`;
     } else {
-      const lastField = formattedFields.pop();
-      return `What's your ${formattedFields.join(', ')}, and ${lastField}?`;
+      // For multiple fields, ask them one by one with the first question
+      const firstField = missingFields[0];
+      return fieldQuestions[firstField] || `What's your ${fieldDescriptions[firstField] || firstField}?`;
     }
   }
 }
