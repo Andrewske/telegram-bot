@@ -32,7 +32,7 @@ interface FoodEntry extends BaseEntry {
 
 class FoodHandler extends BaseHandler implements MessageHandler {
   prefix = 'food';
-  folderName = 'food-journal';
+  folderName = 'diet/food-journal';
 
   async handleMessage(
     message: string,
